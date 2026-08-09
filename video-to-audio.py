@@ -8,18 +8,13 @@ parser.add_argument("video", help="Path to the input video file")
 args = parser.parse_args()
 filename = args.video
 
-try:
-    if filename.lower().endswith(".mp4",".mkv",".avi",".webm",".flv",".ts"):
-        pass
-    else:
-        raise(TypeError)
-    if not Path(filename).is_file():
-        print(f"File not found: {filename}")
-        sys.exit(1)
+if not filename.lower().endswith((".mp4", ".mkv", ".avi", ".webm", ".flv", ".ts")):
+    print(f"Unsupported format: {filename}", file=sys.stderr)
+    sys.exit(1)
 
-        
-except TypeError:
-    print("Not a valid Format")
+if not Path(filename).is_file():
+    print(f"File not found: {filename}", file=sys.stderr)
+    sys.exit(1)
 
     
         
