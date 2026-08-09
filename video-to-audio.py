@@ -8,7 +8,9 @@ def main():
     args = parser.parse_args()
     file_validation(args.video)
     output_audio=renaming_the_file(args.video)
-    subprocess.run(["ffmpeg", "-i", args.video, "-vn", "-acodec", "libmp3lame", str(output_audio)])
+    running_ffempeg(args.video, output_audio)
+
+    
 
 
 def file_validation(filename):
@@ -24,6 +26,14 @@ def file_validation(filename):
 def renaming_the_file(filename):
     output_audio = Path(filename).with_suffix(".mp3")
     return output_audio
+
+
+def running_ffempeg(filename,output_audio):
+    try:
+        subprocess.run(["ffmpeg", "-i", filename, "-vn", "-acodec", "libmp3lame", str(output_audio)], check=True)
+    except subprocess.CalledProcessError:
+        print(f"Conversion failed: {filename}", file=sys.stderr)
+        sys.exit(1)
 
 
 
