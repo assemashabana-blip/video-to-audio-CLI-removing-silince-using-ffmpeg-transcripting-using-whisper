@@ -2,41 +2,73 @@ import subprocess
 import argparse
 import sys
 from pathlib import Path
+
+VIDEO_EXTENSIONS = (".mp4", ".mkv", ".avi", ".webm", ".flv", ".ts")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Convert video to audio.")
-    parser.add_argument("video", help="Path to the input video file")
+    parser.add_argument("video", help="Path to the input video file or a directory of videos")
     args = parser.parse_args()
-    if not file_validation(args.video):    
+
+    target = Path(args.video)
+    files_to_convert = []
+
+    if target.is_dir():
+        for file in target.iterdir():
+            if file.suffix.lower() in VIDEO_EXTENSIONS:
+                files_to_convert.append(file)
+    elif target.is_file():
+        files_to_convert.append(target)
+    else:
+        print(f"Path not found: {target}", file=sys.stderr)
         sys.exit(1)
-    output_audio=output_path(args.video)
-    running_ffmpeg(args.video, output_audio)
 
-def file_validation(filename):
-    if not filename.lower().endswith((".mp4", ".mkv", ".avi", ".webm", ".flv", ".ts")):
-        print(f"Unsupported format: {filename}", file=sys.stderr)
-        return False
+    if not files_to_convert:
+        print("No video files to convert.", file=sys.stderr)
+        sys.exit(1)
 
-    if not Path(filename).is_file():
-        print(f"File not found: {filename}", file=sys.stderr)
-        return False
+    if not file_validation(files_to_convert):
+        sys.exit(1)
+
+    # Loop over every file, not just args.video
+    for file in files_to_convert:
+        output_audio = output_path(file)
+        running_ffmpeg(file, output_audio)
+
+
+def file_validation(files_to_convert):
+    for filename in files_to_convert:
+        filename = Path(filename)
+
+        if filename.suffix.lower() not in VIDEO_EXTENSIONS:
+            print(f"Unsupported format: {filename}", file=sys.stderr)
+            return False
+
+        if not filename.is_file():
+            print(f"File not found: {filename}", file=sys.stderr)
+            return False
+
+    # return True only after checking ALL files, not just the first one
     return True
 
 
 def output_path(filename):
-    output_audio = Path(filename).with_suffix(".mp3")
-    return output_audio
+    return Path(filename).with_suffix(".mp3")
 
 
-def running_ffmpeg(filename,output_audio):
+def running_ffmpeg(filename, output_audio):
     try:
-        subprocess.run(["ffmpeg", "-i", filename, "-vn", "-acodec", "libmp3lame", str(output_audio)], check=True)
+        subprocess.run(
+            ["ffmpeg", "-i", str(filename), "-vn", "-acodec", "libmp3lame", str(output_audio)],
+            check=True,
+        )
     except subprocess.CalledProcessError:
         print(f"Conversion failed: {filename}", file=sys.stderr)
         sys.exit(1)
     except FileNotFoundError:
         print("ffmpeg not found. Install it and make sure it's on your PATH.", file=sys.stderr)
         sys.exit(1)
-
 
 
 if __name__ == "__main__":
