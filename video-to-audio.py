@@ -28,28 +28,38 @@ def main():
         print("No video files to convert.", file=sys.stderr)
         sys.exit(1)
 
-    if not file_validation(files_to_convert):
+    success_count = 0
+    fail_count = 0
+    
+
+    for file in files_to_convert:
+        if not file_validation(file):
+            fail_count += 1
+            continue
+
+        output_audio = output_path(file)
+        if running_ffmpeg(file, output_audio):
+            success_count += 1
+        else:
+            fail_count += 1
+
+    print(f"Done: {success_count} succeeded, {fail_count} failed")
+    if fail_count > 0:
         sys.exit(1)
 
-    # Loop over every file, not just args.video
-    for file in files_to_convert:
-        output_audio = output_path(file)
-        running_ffmpeg(file, output_audio)
 
+def file_validation(filename):
+    filename = Path(filename)
 
-def file_validation(files_to_convert):
-    for filename in files_to_convert:
-        filename = Path(filename)
+    if filename.suffix.lower() not in VIDEO_EXTENSIONS:
+        print(f"Unsupported format: {filename}", file=sys.stderr)
+        return False
 
-        if filename.suffix.lower() not in VIDEO_EXTENSIONS:
-            print(f"Unsupported format: {filename}", file=sys.stderr)
-            return False
+    if not filename.is_file():
+        print(f"File not found: {filename}", file=sys.stderr)
+        return False
+    
 
-        if not filename.is_file():
-            print(f"File not found: {filename}", file=sys.stderr)
-            return False
-
-    # return True only after checking ALL files, not just the first one
     return True
 
 
@@ -63,20 +73,15 @@ def running_ffmpeg(filename, output_audio):
             ["ffmpeg", "-i", str(filename), "-vn", "-acodec", "libmp3lame", str(output_audio)],
             check=True,
         )
+        return True
     except subprocess.CalledProcessError:
         print(f"Conversion failed: {filename}", file=sys.stderr)
-        sys.exit(1)
+        return False
     except FileNotFoundError:
         print("ffmpeg not found. Install it and make sure it's on your PATH.", file=sys.stderr)
-        sys.exit(1)
+        return False
 
 
 if __name__ == "__main__":
     main()
-
-
-
-    
-        
-    
 
