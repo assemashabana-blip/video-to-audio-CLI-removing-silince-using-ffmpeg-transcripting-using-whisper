@@ -64,7 +64,10 @@ def file_validation(filename):
 
 
 def output_path(filename):
-    return Path(filename).with_suffix(".mp3")
+    filename = Path(filename)
+    folder = filename.parent / filename.stem
+    folder.mkdir(exist_ok=True)
+    return folder / (filename.stem + ".mp3")
 
 
 def running_ffmpeg(filename, output_audio):
