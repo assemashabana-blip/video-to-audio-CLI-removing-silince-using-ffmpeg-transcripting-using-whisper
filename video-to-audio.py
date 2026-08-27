@@ -37,11 +37,17 @@ def main():
             fail_count += 1
             continue
 
-        output_audio = output_path(file)
-        if running_ffmpeg(file, output_audio):
+        raw_audio = output_path(file)              
+        clean_audio = output_path(file, "_clean")
+        if running_ffmpeg(file, raw_audio):
             success_count += 1
+            if remove_audio_silence(raw_audio,clean_audio):
+                success_count += 1
+            else:
+                fail_count += 1
         else:
             fail_count += 1
+            
 
     print(f"Done: {success_count} succeeded, {fail_count} failed")
     if fail_count > 0:
@@ -63,25 +69,47 @@ def file_validation(filename):
     return True
 
 
-def output_path(filename):
+def output_path(filename,suffix=""):
     filename = Path(filename)
     folder = filename.parent / filename.stem
     folder.mkdir(exist_ok=True)
-    return folder / (filename.stem + ".mp3")
+    return folder / (filename.stem + suffix + ".mp3")
 
 
-def running_ffmpeg(filename, output_audio):
+
+
+
+def running_ffmpeg(filename, raw_audio):
     try:
         subprocess.run(
-            ["ffmpeg", "-i", str(filename), "-vn", "-acodec", "libmp3lame", str(output_audio)],
-            check=True,
+            ["ffmpeg", "-i", str(filename), "-vn", "-acodec", "libmp3lame", str(raw_audio)]
+            ,check=True
         )
+        
         return True
     except subprocess.CalledProcessError:
         print(f"Conversion failed: {filename}", file=sys.stderr)
         return False
     except FileNotFoundError:
         print("ffmpeg not found. Install it and make sure it's on your PATH.", file=sys.stderr)
+        return False
+
+
+    
+def remove_audio_silence(raw_audio,clean_audio):
+
+    
+    try:
+        
+        subprocess.run(['ffmpeg','-y','-i',str(raw_audio) ,'-af', 'silenceremove=stop_periods=-1:stop_duration=1:stop_threshold=-40dB',
+       str(clean_audio) ],check=True)
+        print(f"Success! Silence removed. Cleaned file saved to: {clean_audio}")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred during FFmpeg execution: {e.stderr}")
+        return False
+    except FileNotFoundError:
+        print("The file is not found",sys.stderr)
         return False
 
 
