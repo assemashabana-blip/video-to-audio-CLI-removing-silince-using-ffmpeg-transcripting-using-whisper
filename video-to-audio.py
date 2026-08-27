@@ -6,7 +6,7 @@ import textwrap
 from pathlib import Path
 
 MEDIA_EXTENSIONS = (".mp4", ".mkv", ".avi", ".webm", ".flv", ".ts", ".mp3", ".m4a")
-SILENCE_FILTER = "silenceremove=stop_periods=-1:stop_duration=1:stop_threshold=-29dB"
+SILENCE_FILTER = "silenceremove=stop_periods=-1:stop_duration=1:stop_threshold=-20dB"
 
 
 def main():
