@@ -6,8 +6,7 @@ import textwrap
 from pathlib import Path
 
 MEDIA_EXTENSIONS = (".mp4", ".mkv", ".avi", ".webm", ".flv", ".ts", ".mp3", ".m4a")
-SILENCE_FILTER = "silenceremove=stop_periods=-1:stop_duration=1:stop_threshold=-20dB"
-
+SILENCE_FILTER = "silenceremove=stop_periods=-1:stop_duration=1:stop_threshold=-30dB"
 
 def main():
     parser = argparse.ArgumentParser(description="Convert video to audio and transcribe.")
@@ -31,40 +30,23 @@ def main():
         print("No media files to convert.", file=sys.stderr)
         sys.exit(1)
 
+    print("Loading Whisper model...")
+    model = whisper.load_model("base")
+
     success_count = 0
     fail_count = 0
-    cleaned_files = []
+
 
     for file in files_to_convert:
-        if not file_validation(file):
+        if process_file(file, model):
+            success_count += 1
+        else:
             fail_count += 1
-            continue
-
-        raw_audio = output_path(file)
-        clean_audio = output_path(file, "_clean")
-
-        if not running_ffmpeg(file, raw_audio):
-            fail_count += 1
-            continue
-
-        if not remove_audio_silence(raw_audio, clean_audio):
-            fail_count += 1
-            continue
-
-        cleaned_files.append((file, clean_audio))
-        success_count += 1
-
-    if cleaned_files:
-        print("Loading Whisper model...")
-        model = whisper.load_model("base")
-
-        for original, cleaned in cleaned_files:
-            if not transcribe(model, original, cleaned):
-                fail_count += 1
 
     print(f"Done: {success_count} succeeded, {fail_count} failed")
     if fail_count > 0:
         sys.exit(1)
+
 
 
 def file_validation(filename):
@@ -131,6 +113,26 @@ def transcribe(model, original, cleaned):
     except Exception as error:
         print(f"Transcription failed for {cleaned}: {error}", file=sys.stderr)
         return False
+
+
+def process_file(video_path, model):
+    if not file_validation(video_path):
+        return None
+
+    raw_audio = output_path(video_path)
+    clean_audio = output_path(video_path, "_clean")
+    transcript = output_path(video_path, extension=".txt")
+
+    if not running_ffmpeg(video_path, raw_audio):
+        return None
+
+    if not remove_audio_silence(raw_audio, clean_audio):
+        return None
+
+    if not transcribe(model, video_path, clean_audio):
+        return None
+
+    return (raw_audio, clean_audio, transcript)
 
 
 
