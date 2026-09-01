@@ -1,4 +1,4 @@
-from flask import Flask , render_template,request,jsonify
+from flask import Flask , render_template,request,jsonify,send_file
 from videoTOaudio import process_file
 import whisper
 import threading
@@ -56,6 +56,28 @@ def status(job_id):
     if job is None:
         return jsonify({"error": "unknown job"}), 404
     return jsonify(job)
+
+
+
+
+
+@app.route("/download/<job_id>/<file_type>")
+def download(job_id, file_type):
+    job = jobs.get(job_id)
+    if job is None:
+        return jsonify({"error": "unknown job"}), 404
+
+    files = job.get("files")
+    if files is None:
+        return jsonify({"error": "job not finished"}), 404
+
+    path = files.get(file_type)
+    if path is None:
+        return jsonify({"error": "unknown file type"}), 404
+
+    return send_file(path, as_attachment=True)
+    
+
 
         
 

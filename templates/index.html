@@ -2,15 +2,65 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>video transcriber</title>
+    <title>Video Transcriber</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <h1>VIDEO TRANSCRIBER</h1>
-<form action="/process" method="POST" enctype="multipart/form-data">
-<input type="text" name="video_path" placeholder="C:\path\to\video.mp4" size="50" multiple autofocus>
-<button type="submit">Upload File</button>
-</form>
+    <h1>Video Transcriber</h1>
 
+    <form id="job-form">
+        <input type="text" id="video-path" name="video_path" size="60"
+               placeholder="C:\path\to\video.mp4">
+        <button type="submit">Start</button>
+    </form>
+
+    <p id="status">Idle</p>
+    <ul id="files"></ul>
+
+<script>
+const form = document.getElementById("job-form");
+const statusText = document.getElementById("status");
+const fileList = document.getElementById("files");
+
+form.addEventListener("submit", async function (event) {
+    event.preventDefault();
+
+    const path = document.getElementById("video-path").value;
+    fileList.innerHTML = "";
+    statusText.textContent = "Starting...";
+
+    const formData = new FormData();
+    formData.append("video_path", path);
+
+    const response = await fetch("/process", { method: "POST", body: formData });
+    const jobId = await response.text();
+
+    statusText.textContent = "Processing...";
+    poll(jobId);
+});
+
+function poll(jobId) {
+    const timer = setInterval(async function () {
+        const response = await fetch("/status/" + jobId);
+        const data = await response.json();
+
+        if (data.status === "Done") {
+            clearInterval(timer);
+            statusText.textContent = "Done";
+        for (const [label, path] of Object.entries(data.files)) {
+            const item = document.createElement("li");
+            const link = document.createElement("a");
+            link.href = "/download/" + jobId + "/" + label;
+            link.textContent = label;
+            item.appendChild(link);
+            fileList.appendChild(item);
+        }
+        } else if (data.status === "Failed") {
+            clearInterval(timer);
+            statusText.textContent = "Failed: " + (data.error || "unknown error");
+        }
+    }, 2000);
+}
+</script>
 </body>
 </html>
