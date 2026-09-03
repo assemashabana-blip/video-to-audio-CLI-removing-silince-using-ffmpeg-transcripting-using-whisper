@@ -1,140 +1,70 @@
-import subprocess
 import whisper
-import argparse
 import sys
 import textwrap
 from pathlib import Path
+from yt_download import download
 
-MEDIA_EXTENSIONS = (".mp4", ".mkv", ".avi", ".webm", ".flv", ".ts", ".mp3", ".m4a")
-SILENCE_FILTER = "silenceremove=stop_periods=-1:stop_duration=1:stop_threshold=-30dB"
+AUDIO_EXTENSIONS = (".mp3", ".m4a", ".wav", ".webm")
+
 
 def main():
-    parser = argparse.ArgumentParser(description="Convert video to audio and transcribe.")
-    parser.add_argument("video", help="Path to the input video file or a directory of videos")
-    args = parser.parse_args()
-
-    target = Path(args.video)
-    files_to_convert = []
-
-    if target.is_dir():
-        for file in target.iterdir():
-            if file.suffix.lower() in MEDIA_EXTENSIONS:
-                files_to_convert.append(file)
-    elif target.is_file():
-        files_to_convert.append(target)
-    else:
-        print(f"Path not found: {target}", file=sys.stderr)
+    if len(sys.argv) < 2:
+        print("Error: Missing YouTube URL.", file=sys.stderr)
+        print("Usage: python videoTOaudio.py <YOUTUBE_URL>", file=sys.stderr)
         sys.exit(1)
 
-    if not files_to_convert:
-        print("No media files to convert.", file=sys.stderr)
+    video_url = sys.argv[1]
+
+    try:
+        target = Path(download(video_url))
+    except Exception as error:
+        print(f"Download failed: {error}", file=sys.stderr)
         sys.exit(1)
 
     print("Loading Whisper model...")
     model = whisper.load_model("base")
 
-    success_count = 0
-    fail_count = 0
-
-
-    for file in files_to_convert:
-        if process_file(file, model):
-            success_count += 1
-        else:
-            fail_count += 1
-
-    print(f"Done: {success_count} succeeded, {fail_count} failed")
-    if fail_count > 0:
+    if process_file(target, model):
+        print("Done: 1 succeeded, 0 failed")
+    else:
+        print("Done: 0 succeeded, 1 failed")
         sys.exit(1)
 
 
-
-def file_validation(filename):
-    filename = Path(filename)
-
-    if filename.suffix.lower() not in MEDIA_EXTENSIONS:
-        print(f"Unsupported format: {filename}", file=sys.stderr)
+def file_validation(target):
+    if target.suffix.lower() not in AUDIO_EXTENSIONS:
+        print(f"Unsupported format: {target}", file=sys.stderr)
         return False
 
-    if not filename.is_file():
-        print(f"File not found: {filename}", file=sys.stderr)
+    if not target.is_file():
+        print(f"File not found: {target}", file=sys.stderr)
         return False
 
     return True
 
 
-def output_path(filename, suffix="", extension=".mp3"):
-    filename = Path(filename)
-    folder = filename.parent / filename.stem
-    folder.mkdir(exist_ok=True)
-    return folder / (filename.stem + suffix + extension)
-
-
-def running_ffmpeg(filename, raw_audio):
+def transcribe(model, target, transcript_path):
     try:
-        subprocess.run(
-            ["ffmpeg", "-y", "-i", str(filename), "-vn",
-             "-acodec", "libmp3lame", "-b:a", "192k", str(raw_audio)],
-            check=True,
-        )
-        return True
-    except subprocess.CalledProcessError:
-        print(f"Conversion failed: {filename}", file=sys.stderr)
-        return False
-    except FileNotFoundError:
-        print("ffmpeg not found. Install it and make sure it's on your PATH.", file=sys.stderr)
-        return False
-
-
-def remove_audio_silence(raw_audio, clean_audio):
-    try:
-        subprocess.run(
-            ["ffmpeg", "-y", "-i", str(raw_audio), "-af", SILENCE_FILTER,
-             "-b:a", "192k", str(clean_audio)],
-            check=True,
-        )
-        return True
-    except subprocess.CalledProcessError:
-        print(f"Silence removal failed: {raw_audio}", file=sys.stderr)
-        return False
-    except FileNotFoundError:
-        print("ffmpeg not found. Install it and make sure it's on your PATH.", file=sys.stderr)
-        return False
-
-
-def transcribe(model, original, cleaned):
-    transcript_path = output_path(original, extension=".txt")
-    try:
-        result = model.transcribe(str(cleaned), fp16=False)
+        result = model.transcribe(str(target), fp16=False)
         with open(transcript_path, "w", encoding="utf-8") as f:
             f.write(textwrap.fill(result["text"], width=70))
         print(f"Transcript saved: {transcript_path}")
         return True
     except Exception as error:
-        print(f"Transcription failed for {cleaned}: {error}", file=sys.stderr)
+        print(f"Transcription failed for {target}: {error}", file=sys.stderr)
         return False
 
 
-def process_file(video_path, model):
-    if not file_validation(video_path):
+def process_file(target, model):
+    if not file_validation(target):
         return None
 
-    raw_audio = output_path(video_path)
-    clean_audio = output_path(video_path, "_clean")
-    transcript = output_path(video_path, extension=".txt")
+    transcript = target.with_suffix(".txt")
 
-    if not running_ffmpeg(video_path, raw_audio):
+    if not transcribe(model, target, transcript):
         return None
 
-    if not remove_audio_silence(raw_audio, clean_audio):
-        return None
-
-    if not transcribe(model, video_path, clean_audio):
-        return None
-
-    return (raw_audio, clean_audio, transcript)
-
-
+    return transcript
 
 
 if __name__ == "__main__":
