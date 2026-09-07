@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Transcriber</title>
+    <title>YouTube Transcriber</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>Video Transcriber</h1>
+        <h1>YouTube Transcriber</h1>
 
         <form id="job-form">
             <input type="text" id="video-path" name="video_path"
-                   placeholder="C:\path\to\video.mp4" autocomplete="off">
+                   placeholder="https://www.youtube.com/watch?v=..." autocomplete="off">
             <button type="submit">Start</button>
         </form>
 
@@ -28,9 +28,9 @@ const fileList = document.getElementById("files");
 form.addEventListener("submit", async function (event) {
     event.preventDefault();
 
-    const path = document.getElementById("video-path").value.trim();
-    if (path === "") {
-        statusText.textContent = "Enter a file or folder path first";
+    const url = document.getElementById("video-path").value.trim();
+    if (url === "") {
+        statusText.textContent = "Paste a YouTube URL first";
         statusText.className = "failed";
         return;
     }
@@ -40,13 +40,13 @@ form.addEventListener("submit", async function (event) {
     statusText.className = "working";
 
     const formData = new FormData();
-    formData.append("video_path", path);
+    formData.append("video_path", url);
 
     try {
         const response = await fetch("/process", { method: "POST", body: formData });
         const jobId = await response.text();
 
-        statusText.textContent = "Processing...";
+        statusText.textContent = "Downloading and transcribing...";
         statusText.className = "working";
         poll(jobId);
     } catch (error) {
@@ -83,8 +83,7 @@ function poll(jobId) {
 
 function showFiles(jobId, files) {
     const labels = {
-        raw_audio: "Audio",
-        clean_audio: "Cleaned audio",
+        audio: "Audio",
         transcript: "Transcript"
     };
 
